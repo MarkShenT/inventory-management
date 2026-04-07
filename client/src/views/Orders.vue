@@ -25,6 +25,42 @@
           <div class="stat-label">{{ t('status.backordered') }}</div>
           <div class="stat-value">{{ getOrdersByStatus('Backordered').length }}</div>
         </div>
+        <div class="stat-card info">
+          <div class="stat-label">{{ t('status.submitted') }}</div>
+          <div class="stat-value">{{ submittedOrders.length }}</div>
+        </div>
+      </div>
+
+      <div v-if="submittedOrders.length > 0" class="card card-submitted">
+        <div class="card-header">
+          <h3 class="card-title">{{ t('submittedOrders.title') }} ({{ submittedOrders.length }})</h3>
+        </div>
+        <div class="table-container">
+          <table class="orders-table submitted-table">
+            <thead>
+              <tr>
+                <th class="col-order-number">{{ t('orders.table.orderNumber') }}</th>
+                <th class="col-items">{{ t('orders.table.items') }}</th>
+                <th class="col-value">{{ t('orders.table.totalValue') }}</th>
+                <th class="col-date">{{ t('orders.table.orderDate') }}</th>
+                <th class="col-date">{{ t('orders.table.expectedDelivery') }}</th>
+                <th class="col-lead-time">{{ t('submittedOrders.leadTime') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in submittedOrders" :key="order.order_number">
+                <td class="col-order-number"><strong>{{ order.order_number }}</strong></td>
+                <td class="col-items">{{ t('orders.itemsCount', { count: order.items.length }) }}</td>
+                <td class="col-value"><strong>{{ currencySymbol }}{{ order.total_value.toLocaleString() }}</strong></td>
+                <td class="col-date">{{ formatDate(order.order_date) }}</td>
+                <td class="col-date">{{ formatDate(order.expected_delivery) }}</td>
+                <td class="col-lead-time">
+                  <span class="badge badge-submitted">{{ t('submittedOrders.days', { count: getLeadTime(order) }) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card">
@@ -45,7 +81,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="order in orders" :key="order.id">
+              <tr v-for="order in regularOrders" :key="order.id">
                 <td class="col-order-number"><strong>{{ order.order_number }}</strong></td>
                 <td class="col-customer">{{ translateCustomerName(order.customer) }}</td>
                 <td class="col-items">
@@ -87,7 +123,7 @@ import { useI18n } from '../composables/useI18n'
 export default {
   name: 'Orders',
   setup() {
-    const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
+    const { t, currentCurrency, currentLocale, translateProductName, translateCustomerName } = useI18n()
 
     const currencySymbol = computed(() => {
       return currentCurrency.value === 'JPY' ? '¥' : '$'
@@ -129,6 +165,14 @@ export default {
       loadOrders()
     })
 
+    const submittedOrders = computed(() => {
+      return orders.value.filter(order => order.status === 'Submitted')
+    })
+
+    const regularOrders = computed(() => {
+      return orders.value.filter(order => order.status !== 'Submitted')
+    })
+
     const getOrdersByStatus = (status) => {
       return orders.value.filter(order => order.status === status)
     }
@@ -138,15 +182,25 @@ export default {
         'Delivered': 'success',
         'Shipped': 'info',
         'Processing': 'warning',
-        'Backordered': 'danger'
+        'Backordered': 'danger',
+        'Submitted': 'info'
       }
       return statusMap[status] || 'info'
     }
 
+    const getLeadTime = (order) => {
+      const orderDate = new Date(order.order_date)
+      const deliveryDate = new Date(order.expected_delivery)
+      if (isNaN(orderDate.getTime()) || isNaN(deliveryDate.getTime())) return 0
+      return Math.round((deliveryDate - orderDate) / (1000 * 60 * 60 * 24))
+    }
+
     const formatDate = (dateString) => {
-      const { currentLocale } = useI18n()
+      if (!dateString) return '-'
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return dateString
       const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
-      return new Date(dateString).toLocaleDateString(locale, {
+      return date.toLocaleDateString(locale, {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -160,8 +214,11 @@ export default {
       loading,
       error,
       orders,
+      submittedOrders,
+      regularOrders,
       getOrdersByStatus,
       getOrderStatusClass,
+      getLeadTime,
       formatDate,
       currencySymbol,
       translateProductName,
@@ -275,5 +332,23 @@ export default {
 .item-meta {
   font-size: 0.813rem;
   color: #64748b;
+}
+
+/* Submitted restocking orders card */
+.card-submitted {
+  border-left: 4px solid #3b82f6;
+}
+
+.col-lead-time {
+  width: 110px;
+}
+
+.submitted-table .col-items {
+  width: 100px;
+}
+
+.badge-submitted {
+  background: #dbeafe;
+  color: #1e40af;
 }
 </style>

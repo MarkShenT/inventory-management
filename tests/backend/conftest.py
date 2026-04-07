@@ -12,6 +12,7 @@ server_path = Path(__file__).parent.parent.parent / "server"
 sys.path.insert(0, str(server_path))
 
 from main import app
+import mock_data
 
 
 @pytest.fixture
@@ -19,6 +20,13 @@ def client():
     """Create a test client for the FastAPI application."""
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def clear_submitted_orders():
+    """Clear submitted orders between tests to prevent state pollution."""
+    yield
+    mock_data.submitted_orders.clear()
 
 
 @pytest.fixture
